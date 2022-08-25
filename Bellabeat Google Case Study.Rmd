@@ -1,0 +1,440 @@
+---
+title: "Bellabeat Google Certificate Case Study"
+author: "Raul Moreira"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## **Bellabeat**
+
+Bellabeat is a fitness technology company headquartered in San Francisco, CA. It was founded by Urška Sršen and Sando Mur in 2013. Bellabeat focuses exclusively on women’s health and uses data to help women better understand how their bodies work and make healthier choices. Bellabeat has a range of products including smart water bottles, watches, and bracelets. Their flagship health monitor, Ivy, tracks sleep, heart rate, activity, and other health data.
+
+**Business task:** Identify trends and use data-driven decision-making to make strategic recommendations to the marketing team in order to gain insight about how consumers are using their smart devices.
+
+**Key stakeholders:**
+
+Urška Sršen: Bellabeat’s co-founder and Chief Creative Officer
+
+Sando Mur: Mathematician and Bellabeat’s cofounder; a key member of the Bellabeat executive team 
+
+Bellabeat marketing analytics team
+
+## **1- Prepare Phase**
+##### **1.1- About the data**
+
+The data was collected through a survey via Amazon Mechanical Turk between 03/12/2016 and 05/12/2016. The data was collected from 33 consenting Fitbit users who submitted personal tracker data, including heart rate, sleep monitoring, physical activity, and more. 
+
+https://www.kaggle.com/datasets/arashnic/fitbit
+
+##### **1.2- Data Ethics**
+
+The data was made available to Kaggle by Möbius.
+
+License: CC0: Public Domain
+
+This dataset contains no personally identifiable information (PII). All users consented to the submission of their data.
+
+##### **1.3- Data reliability**
+
+The reliability of this data will be assessed using the ROCCC method. ROCCC stands for Reliable, Original, Comprehensive, Current, and Cited.
+
+R – This database has been used for years in an educational context. It is small, it only contains data from 33 individuals. Due to its size, the dataset is not reliable, but it is useful for this case study
+
+O – This data was collected by Amazon Mechanical Turk and uploaded to Kaggle by Möbius
+
+C – The data is not comprehensive. Since the data was collected through a Fitbit it requires the users to reliably wear their device. There are missing values in the data, for example only 24 out of the 33 users wore their watch to sleep and only 8 reported weight data.
+
+C – This data is not current; it was collected between 03/12/2016 and 05/12/2016.
+
+C – Citation: Furberg, R., Brinton, J., Keating, M., & Ortiz, A. (2016). Crowd-sourced Fitbit datasets 03.12.2016-05.12.2016 [Data set]. Zenodo. https://doi.org/10.5281/zenodo.53894
+
+
+## **2- Process Data**
+
+In this phase, I will process the data. First, I will upload all the packages I need for this project. These packages will be essential for the analysis. Secondly, I will upload the data downloaded from Kaggle. Then I will explore the data using the head, tail, column names, and more. After exploring the data, I will clean it to make it more reliable for analysis. These pre-analysis steps are vital to the integrity of our findings.
+
+##### **2.1- Loading Packages**
+
+The packages I will need are Tidyverse, Lubridate, and Scales. If you do not currently have these installed, you will need to use the code *install.packages()*.
+
+```{r Load Packages}
+# Load Packages
+library(tidyverse)
+library(lubridate)
+library(scales)
+```
+
+
+##### **2.2- Import Data**
+
+The data was downloaded as comma-separated values or .CSV. I can use the code *read.csv* to import the data into R.
+
+```{r Import Data}
+# Import Data
+daily_activity <- read.csv('dailyActivity_merged.csv')
+daily_steps <- read.csv('dailySteps_merged.csv')
+hourly_steps <- read.csv('hourlySteps_merged.csv')
+hourly_calories <- read.csv('hourlyCalories_merged.csv')
+
+```
+
+##### **2.3- Exploring the Data**
+
+To explore the data, I will use *colnames()*, *n_distinct()*, *n_row()* to gain surface level information. I also used the *summary()* function to dive a little deeper into what this data can tell us.
+
+```{r Column names}
+#Column Names
+colnames(daily_activity)    
+colnames(daily_steps)       
+colnames(hourly_steps)
+colnames(hourly_calories)
+```
+
+```{r Number of distinct ID}
+# Number of Distinct Participants
+n_distinct(daily_activity$Id)
+n_distinct(daily_steps$Id)
+n_distinct(hourly_steps$Id)
+n_distinct(hourly_calories$Id)
+```
+
+```{r Number of observations}
+# Number of Observations
+nrow(daily_activity)
+nrow(daily_steps)
+nrow(hourly_steps)
+nrow(hourly_calories)
+```
+
+```{r Summary statistics}
+## summary statistics
+
+daily_activity %>%
+  select(TotalSteps,
+         TotalDistance,
+         SedentaryMinutes) %>%
+  summary()
+
+daily_steps %>%
+  select(StepTotal) %>%
+  summary()
+
+hourly_steps %>%
+  select(StepTotal) %>%
+  summary()
+
+hourly_calories %>%
+  select(Calories) %>%
+  summary()
+```
+
+##### **2.4- Data Cleaning**
+
+To clean the data, I filtered out rows where the person did not wear the Fitbit enough to be relevant for my analysis, this includes rows that had fewer than 100 steps per day and more than 1380 sedentary minutes. The original dataset only had a **ActivityHour** column which included both date and time, I used *as.POSIXct()* and *format()* to separate time, date, and hour.
+
+```{r Data Cleaning}
+# Clean data points where it is clean the person did not wear their Fitbit
+da_clean <- unique(daily_activity) %>%
+  filter(TotalSteps > 100 & SedentaryMinutes < 1380) %>%
+  drop_na()
+
+ds_clean <- unique(daily_steps) %>%
+  filter(StepTotal > 100) %>%
+  drop_na()
+
+```
+
+```{r Date and Time consistency}
+#Hourly Calories
+hc <- hourly_calories
+hc$ActivityHour=as.POSIXct(hc$ActivityHour, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+hc$time <- format(hc$ActivityHour, format = '%H:%M:%S')
+hc$date <- format(hc$ActivityHour, format = '%m/%d/%Y')
+hc$hour <- format(hc$ActivityHour, format = '%H:00:00')
+hc$date <- as.Date(hc$date, format = '%m/%d/%Y')
+
+#Hourly steps
+hs <- hourly_steps
+hs$ActivityHour=as.POSIXct(hc$ActivityHour, format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+hs$time <- format(hc$ActivityHour, format = '%H:%M:%S')
+hs$date <- format(hc$ActivityHour, format = '%m/%d/%Y')
+hs$hour <- format(hc$ActivityHour, format = '%H:00:00')
+hs$date <- as.Date(hc$date, format = '%m/%d/%Y')
+
+```
+
+
+## **3- Analyze**
+
+In the analysis phase of the project, I will use the data I have cleaned and organized to answer questions and gain insight to make data-driven decisions.
+The questions I seek to answer are:
+
+1. What are the trends and habits of users? 
+
+2. How can I use individual habits to increase usage?
+
+3. How can health trends influence Bellabeat marketing strategy?
+
+##### **3.1- Usage**
+
+The first analysis I ran was looking at how many steps per hour a user would walk based on how many days they used their Fitbit. Between 03/12/2016 and 05/12/2016, If a user were their Fitbit for fewer than 10 days, they are considered low use, if they used it between 11 and 20 days, they are considered moderate use, and if they use their device for more than 21 days, they are considered high use. 
+```{r Usage}
+# Organizing data based on how many days the Fitbit was used
+daily_use <- da_clean %>%
+  group_by(Id) %>%
+  summarize(days_used=sum(n())) %>%
+  mutate(usage = case_when(
+    days_used >= 1 & days_used <= 10 ~ "low use",
+    days_used >= 11 & days_used <= 20 ~ "moderate use", 
+    days_used >= 21 & days_used <= 31 ~ "high use", 
+  ))
+
+# Calculating the mean steps per hours
+avg_step_id <- hs %>%
+  group_by(Id) %>%
+  summarise(avg_step_id = mean(StepTotal))
+
+# Merge daily use and average steps
+use_steps <- merge(daily_use, avg_step_id, by = 'Id')
+
+# Using ggplot to create a plot
+usage_plot <- ggplot(data = use_steps, aes(avg_step_id, usage, color = usage)) + 
+  geom_point()+
+  labs(title = 'Average steps per hour and Smart Watch Usage')+
+  ylab('Usage')+
+  xlab('Average Steps Per Hour')+
+  theme_dark()+
+  theme(panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())
+usage_plot
+
+```
+
+**Conclusion:** It is evident from the visualization that people who wear their health tracker more often also tend to take more steps per hour. 
+
+**Recommendation:** It is paramount that Bellabeat users wear their smart device in order to have the best experience. People who wear their smart devices tend to be more active. My recommendation is to use the Bellabeat mobile app to remind users to wear their health trackers every day. Notification reminders would increase the number of users who wear Bellabeat products. Once they are wearing their devices, Bellabeat can again use notifications to encourage users to make healthier choices.
+
+##### **3.2.0- Total Steps**
+
+The second analysis I ran looks at steps per hour. The goal is to figure out the times of day that users are taking steps. 
+
+```{r Total Steps}
+# Calculating the total steps per hour for all users
+average_steps <- hs %>%
+  group_by(time) %>%
+  summarise(ts=sum(StepTotal))
+  
+# Plotting the total steps per hour for all users and the time of day
+overal_steps_plot <- ggplot(data = average_steps, aes(time, ts))+ 
+  geom_bar(stat = 'identity', fill = 'black' )+ 
+  scale_y_continuous(labels = comma) +
+  theme_dark() +
+  theme(axis.text.x = element_text(angle = 45),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())+
+  labs(title = 'Total Steps per Hour')+
+  xlab('Time of day')+
+  ylab('Total Steps')
+
+overal_steps_plot
+```
+
+**Conclusion:** From this graph I can see that there are 2 major spikes where steps were at its highest, the first spike is between 12:00 and 14:00, there is a significant dip in steps at 15:00 but another spike between 17:00 and 19:00. This is a great visualization because I can see that in the aggregate people walk at all hours of the day. However, this is not enough to make any recommendations, I must take a deeper dive into individual users.
+
+##### **3.2.1- Individual Steps**
+
+Let’s take a closer look at individual users and steps. I picked 4 user IDs at random and plotted their steps and the time of day. 
+
+```{r Total Steps per ID}
+
+
+
+# 366
+# Filter steps per hours for just one individual user 1503960366
+steps_366 <- hs %>%
+  filter(Id == 1503960366)
+
+# calculate the total steps per hour for the individual user
+average_steps_366 <- steps_366 %>%
+  group_by(time) %>%
+  summarise(ts=sum(StepTotal))
+
+# Plotting the total steps per hour for individual user and the time of day
+user_366 <- ggplot(data = average_steps_366, aes(time, ts)) +
+  geom_bar(stat = 'identity', fill = 'dark green' )+
+  scale_y_continuous(labels = comma) +
+  theme_dark() +
+  theme(axis.text.x = element_text(angle = 45),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())+
+  labs(title = 'Total Steps per Hour', subtitle = 'User ID 1503960366')+
+  xlab('Time of day')+
+  ylab('Total Steps')
+
+user_366
+
+# 650
+steps_650 <- hs %>%
+  filter(Id == 4020332650)
+
+average_steps_650 <- steps_650 %>%
+  group_by(time) %>%
+  summarise(ts=sum(StepTotal))
+
+
+user_650 <- ggplot(data = average_steps_650, aes(time, ts)) +
+  geom_bar(stat = 'identity', fill = 'dark blue' )+
+  scale_y_continuous(labels = comma) +
+  theme_dark() +
+  theme(axis.text.x = element_text(angle = 45),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())+
+  labs(title = 'Total Steps per Hour', subtitle = 'User ID 4020332650')+
+  xlab('Time of day')+
+  ylab('Total Steps')
+
+user_650
+
+# 313
+steps_313 <- hs %>%
+  filter(Id == 5577150313)
+
+average_steps_313 <- steps_313 %>%
+  group_by(time) %>%
+  summarise(ts=sum(StepTotal))
+
+
+user_313 <- ggplot(data = average_steps_313, aes(time, ts)) +
+  geom_bar(stat = 'identity', fill = 'dark orange' )+
+  scale_y_continuous(labels = comma)+
+  theme_dark() +
+  theme(axis.text.x = element_text(angle = 45),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())+
+  labs(title = 'Total Steps per Hour', subtitle = 'User ID 5577150313')+
+  xlab('Time of day')+
+  ylab('Total Steps')
+
+user_313
+
+# 171
+steps_171 <- hs %>%
+  filter(Id == 7007744171)
+
+average_steps_171 <- steps_171 %>%
+  group_by(time) %>%
+  summarise(ts=sum(StepTotal))
+
+
+user_171 <- ggplot(data = average_steps_171, aes(time, ts)) +
+  geom_bar(stat = 'identity', fill = 'red' )+
+  scale_y_continuous(labels = comma) +
+  theme_dark() +
+  theme(axis.text.x = element_text(angle = 45),
+        panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())+
+  labs(title = 'Total Steps per Hour', subtitle = 'User ID 7007744171')+
+  xlab('Time of day')+
+  ylab('Total Steps')
+
+user_171
+```
+
+**Conclusion:** After analyzing these 4 graphs I can see that every one of these 4 users has a spike in steps at a different time of the day. This means that I cannot generalize when it comes to when people exercise. 
+
+**Recommendation:** My recommendation would be to use machine learning to identify each user’s preferences. Once user preferences have been identified Bellabeat can use notifications to set goals and encourage the user to get in the habit of working out based on their schedule.
+
+##### **3.2.2 Average Steps Per Hour Z-Score**
+
+Bellabeat`s mission is all about making healthier choices based on data. I compiled the data for steps per hour and averaged it based on each user ID. The minimum average steps per hour are 38.59, the mean is 315.95 and the maximum average is 674.32 with a standard deviation of 151.51. Armed with this information I calculated the Z-score for each user and plotted it, the Z-score gives me an idea of how far from the mean a data point is. Z-score is a measure of how mean standard deviations are below or above the mean raw score. This bar graph makes it easy to identify which user is walking more or less than the average.
+
+```{r}
+# Making sure Id was a character and not numeric
+avg_step_id$Id <- as.character(avg_step_id$Id)
+# Calculating the Z-Score for each user
+avg_step_id$step_Z <- (avg_step_id$avg_step_id - mean(avg_step_id$avg_step_id))/sd(avg_step_id$avg_step_id)
+# Determining if individuals Z-Score is above or below the average
+avg_step_id$step_type <- ifelse(avg_step_id$step_Z < 0, 'below', 'above')
+# Organizing Z-Scores in ascending order
+avg_step_id <-avg_step_id[order(avg_step_id$step_Z),]
+# Creating a factor
+avg_step_id$Id <- factor(avg_step_id$Id, levels = avg_step_id$Id)
+
+# Displaying the Min,1st Quartile, Median, Mean, 3rd Quartile, Max, and Standard Deviation 
+summary(avg_step_id$avg_step_id)
+sd(avg_step_id$avg_step_id)
+
+# Plotting Z-Score for each user
+steps_z_score <- ggplot(avg_step_id, aes(x = Id, y = step_Z, label = step_Z)) +
+  geom_bar(stat='identity', aes(fill=step_type), width=.5) +
+  scale_fill_manual(name = 'Steps',
+                    labels = c('Above Average', 'Below Average'),
+                    values = c('above'='#00ba38', 'below'='#f8766d')) +
+  theme_dark() +
+  theme(panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())+
+  labs(title = 'Average Steps per Hour Z-Score per User')+
+  xlab('User ID')+
+  ylab('Steps Z-Scores')+
+  coord_flip()
+
+steps_z_score
+
+```
+
+**Conclusion:** As I can see from this chart, only half of the users are walking more than average. The green identifies the users walking more than average and the red identifies users walking less than average. 0 signifies the mean (315.95 average steps per hour), 1 signifies 1 standard deviation (sd = 151.51 steps) more steps than the mean (315.95 + 151.51 = 467.46 steps), -1 signifies 1 standard deviation fewer steps than the mean (315.95 - 151.51 = 164.44 average steps per hour)
+
+
+
+**Recommendation:** Now that the users who walk less than average have been identified, Bellabeat can focus marketing campaigns to incentivize them to increase their average steps per hour. My idea is to notify the user every hour to take a few steps, many people are working sitting down for hours and get no steps at all. Bellabeat notifying users to get up and walk even for just a few steps would increase the steps per hour helping them improve their health. Another idea would be for Bellabeat to set up virtual competitions such as monthly steps goal. These competitions would encourage users to users fulfill goals and join the Bellabeat community. 
+
+##### **3.3- Calories and Steps**
+
+What is the relationship between distance and calories burned. My theory is that when people walk longer distances, they tend to burn more calories.
+
+```{r}
+
+# Plotting calories and distance
+calorie_distance <- ggplot(data = da_clean, aes(Calories, TotalDistance)) + 
+  geom_point()+
+  geom_smooth()+
+  labs(title = 'Calories and Distance')+
+  ylab('Total Distance (km)')+
+  xlab('Total Calories Burned')+
+  theme_dark()+
+  theme(panel.grid.major = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())
+
+calorie_distance
+```
+
+**Conclusion:** I can clearly see from the line a positive relationship between distance and calories burned. The positive relationship means that if more distance is traveled, more calories are burned.
+
+**Recommendation:** My recommendation is for Bellabeat to create a questionnaire for each new Bellabeat customer. This questionnaire would create a custom workout profile based on the goals of each user. I identified a positive relationship between distance and calories burned, if a customer sets her goal to be to burn more calories a day, then I can recommend a distance goal and set milestones. These milestones will help our users achieve their individual goals.
+
+## **4- Summary**
+
+Data is power. Collecting, cleaning, analyzing, visualizing, and sharing data can be powerful tools for any business. Bellabeat has set out to empower women to live healthier lifestyles through data. In this case 
+study, I aimed to analyze Fitbit data to make data-driven business recommendations to Bellabeat. A summary of my recommendations are:
+
+1. Use the Bellabeat app to remind users to wear their smart devices every day.
+
+2. Use machine learning to identify each individual user’s profile. Bellabeat can use this information to set up reminders and notifications encouraging physical activity.
+
+3. Set up a survey that will identify each user’s goals and health aspirations. Once these goals have been identified I can use each individual profile to recommend workouts and help them achieve their health goals. Bellabeat could set up virtual competitions or users could create their own competitions with their friends to motivate each other. I think it is important for Bellabeat to foster a community of users that want to help one another.
+
+I believe that with these 3 data-driven recommendations Bellabeat could take its products and services to the next level. Advancing Bellabeat`s goal of empowering women to live healthier lives. 
